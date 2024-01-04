@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS
+        "lsm6dsox_reg.c"
+        "lsm6dsox_driver.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES
+        "driver"
+)
