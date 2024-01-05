@@ -25,7 +25,23 @@ void app_main(void)
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG,"I2C Initialised successfully");
 
-    lsm_init(I2C_MASTER_NUM);
+    LSM_DriverConfig LSM_config = {
+        .i2c_num = 0,
+        .LSM_SA = 0,
+
+        .Acc_Data_Rate = LSM6DSOX_XL_ODR_104Hz,
+        .Gyr_Data_Rate = LSM6DSOX_GY_ODR_104Hz,
+        .Acc_Scale = LSM6DSOX_8g,
+        .Gyr_Scale = LSM6DSOX_1000dps
+    };
+
+    int ret = lsm_init(&LSM_config);
+    if(ret){
+        ESP_LOGW(TAG,"Error in init");
+    }
+    else{
+        ESP_LOGI(TAG,"OK");
+    }
 }
 
 static esp_err_t i2c_master_init(void)
