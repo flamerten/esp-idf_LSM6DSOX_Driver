@@ -7,24 +7,30 @@
 
 #include "lsm6dsox_driver.h"
 
-
-int lsm_init(LSM_DriverConfig *sensor_config)
+/**
+ * @brief    Check LSM sensor based on sensor_cfg and configure accel &
+ * gyro data rate & scale. Block data rate set, and filtering added to accel. 
+ * 
+ * @param sensor_cfg   pointer to LSM_DriverConfig
+ * @return int32_t     0 if okay, else return esp_err_t
+ */
+int32_t lsm_init(LSM_DriverConfig *sensor_cfg)
 {   
     char* TAG = "lsm_init";
 
-    if(sensor_config->LSM_SA){
-        sensor_config->LSM_8bit_addr = (LSM6DSOX_I2C_ADD_H >> 1);
+    if(sensor_cfg->LSM_SA){
+        sensor_cfg->LSM_8bit_addr = (LSM6DSOX_I2C_ADD_H >> 1);
     }
     else{
-        sensor_config->LSM_8bit_addr = (LSM6DSOX_I2C_ADD_L >> 1); 
+        sensor_cfg->LSM_8bit_addr = (LSM6DSOX_I2C_ADD_L >> 1); 
     }
 
-    stmdev_ctx_t dev_ctx;
-    dev_ctx.write_reg = platform_write;
-    dev_ctx.read_reg = platform_read;
-    dev_ctx.handle = sensor_config;
+    sensor_cfg->dev_ctx.write_reg = platform_write;
+    sensor_cfg->dev_ctx.read_reg = platform_read;
+    sensor_cfg->dev_ctx.handle = sensor_cfg;
 
     uint8_t whoamI;
+    stmdev_ctx_t dev_ctx = sensor_cfg->dev_ctx;
     
     lsm6dsox_device_id_get(&dev_ctx,&whoamI);
 
@@ -36,18 +42,108 @@ int lsm_init(LSM_DriverConfig *sensor_config)
         ESP_LOGI(TAG,"Sensor detected");
     }
 
-    int ret = 0;
-    ret = lsm6dsox_xl_data_rate_set(&dev_ctx,sensor_config->Acc_Data_Rate);
-    ret = lsm6dsox_xl_full_scale_set(&dev_ctx,sensor_config->Acc_Scale);
+    uint8_t ret = 0;
 
-    ret = lsm6dsox_gy_data_rate_set(&dev_ctx,sensor_config->Gyr_Data_Rate);
-    ret = lsm6dsox_gy_full_scale_set(&dev_ctx,sensor_config->Gyr_Scale);
+    //Reset Sensor to default configurations
+    uint8_t rst;
+    lsm6dsox_reset_set(&dev_ctx,PROPERTY_ENABLE);
+
+    do {
+        lsm6dsox_reset_get(&dev_ctx, &rst);
+    } while (rst);
+
+    ret = lsm6dsox_i3c_disable_set(&dev_ctx, LSM6DSOX_I3C_DISABLE)  & ret;
+    ret = lsm6dsox_block_data_update_set(&dev_ctx, PROPERTY_ENABLE) & ret;
+
+    //Is there a need to set data rate again? - Should cbeck
+    ret = lsm6dsox_xl_data_rate_set(&dev_ctx,sensor_cfg->Acc_Data_Rate) & ret; 
+    ret = lsm6dsox_xl_full_scale_set(&dev_ctx,sensor_cfg->Acc_Scale)    & ret; 
+
+    ret = lsm6dsox_gy_data_rate_set(&dev_ctx,sensor_cfg->Gyr_Data_Rate) & ret;
+    ret = lsm6dsox_gy_full_scale_set(&dev_ctx,sensor_cfg->Gyr_Scale)    & ret;
+
+    //Accel Filtering - Low Pass of ODR/100, 
+    ret = lsm6dsox_xl_hp_path_on_out_set(&dev_ctx,LSM6DSOX_LP_ODR_DIV_100) & ret;
+    ret = lsm6dsox_xl_filter_lp2_set(&dev_ctx,PROPERTY_ENABLE)             & ret;
+
+    //Gyro Filtering - I think not neccessary
+
+    if(ret){
+        handle_esp_err("LSM_Config",ret);
+    }
     
     return ret;
 
 } 
 
+int32_t lsm_update_raw(LSM_DriverConfig *sensor_cfg)
+{   
+    int32_t err = 0;
+    err = lsm6dsox_acceleration_raw_get(&(sensor_cfg->dev_ctx),sensor_cfg->Acc_Raw) & err;
+    err = lsm6dsox_angular_rate_raw_get(&(sensor_cfg->dev_ctx),sensor_cfg->Gyr_Raw) & err;
 
+    if(!err){
+        return 0;
+    }
+
+    handle_esp_err("lsm_raw_fetch",err);
+    return err;
+
+}
+
+int32_t lsm_convert_raw(LSM_DriverConfig *sensor_cfg)
+{
+    lsm6dsox_fs_xl_t AccScale = sensor_cfg->Acc_Scale;
+    
+    float_t (*AccScaleChange)(int16_t);
+    switch(AccScale){
+        case LSM6DSOX_2g:
+            AccScaleChange = &lsm6dsox_from_fs2_to_mg;
+            break;
+        case LSM6DSOX_16g:
+            AccScaleChange = &lsm6dsox_from_fs16_to_mg;
+            break;
+        case LSM6DSOX_4g:
+            AccScaleChange = &lsm6dsox_from_fs4_to_mg;
+            break;
+        case LSM6DSOX_8g:
+            AccScaleChange = &lsm6dsox_from_fs8_to_mg;
+            break;
+    }
+    for(int i = 0; i < 3; i++){
+        (sensor_cfg->Acc_mg)[i] = AccScaleChange((sensor_cfg->Acc_Raw)[i]);
+    }
+
+    return 0;
+}
+
+int32_t lsm_get_raw_gyro(LSM_DriverConfig *sensor_cfg, int16_t *gyr_data)
+{
+    return lsm6dsox_angular_rate_raw_get(&(sensor_cfg->dev_ctx),gyr_data);
+}
+
+/**
+ * @brief    Given that block data update is set, check that both accel and gyro
+ * data is ready to be read.
+ * 
+ * @param sensor_cfg   ptr to LSM_DriverConfig
+ * @return int32_t     0 if okay, else return esp_err_t
+ */
+int32_t lsm_data_ready(LSM_DriverConfig *sensor_cfg)
+{
+    uint8_t err = 0;
+    uint8_t xl_reg,gy_reg;
+
+    err = lsm6dsox_xl_flag_data_ready_get(&(sensor_cfg->dev_ctx),&xl_reg) & err;
+    err = lsm6dsox_gy_flag_data_ready_get(&(sensor_cfg->dev_ctx),&gy_reg) & err;
+
+    if(err != 0){
+        handle_esp_err("Data_Rdy",err);
+        return err;
+    }
+
+    return (xl_reg & gy_reg);
+}
 
 /**
  * @brief    Write generic device register for ESP-IDF based on PID
@@ -56,13 +152,13 @@ int lsm_init(LSM_DriverConfig *sensor_config)
  * @param Reg          register to write
  * @param Bufp         pointer to data to write in register reg
  * @param len          number of consecutive register to write
- * @return int32_t     0 if ok, else 1
+ * @return int32_t     0 if ok, else return esp_err_t
  */
 int32_t platform_write(void *handle, uint8_t Reg, const uint8_t *Bufp, uint16_t len)
 {   
     LSM_DriverConfig *sensor_config = (LSM_DriverConfig *)handle;
     uint8_t sensor_addr = sensor_config->LSM_8bit_addr;
-    i2c_port_t i2c_port_number = sensor_config->i2c_num;
+    i2c_port_t i2c_port_number = sensor_config->i2c_port_num;
 
     //Create a new buffer, message that includes register to write to
     uint8_t msg[len + 1];
@@ -85,7 +181,6 @@ int32_t platform_write(void *handle, uint8_t Reg, const uint8_t *Bufp, uint16_t 
     }
 }
 
-
 /**
  * @brief    Read generic device register for ESP-IDF based on PID 
  * 
@@ -93,14 +188,13 @@ int32_t platform_write(void *handle, uint8_t Reg, const uint8_t *Bufp, uint16_t 
  * @param Reg          register to read
  * @param Bufp         pointer to buffer that store the data read
  * @param len          number of consecutive register to read
- * @return int32_t     0 if okay, else 1
+ * @return int32_t     0 if okay, else return esp_err_t
  */
 int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp, uint16_t len)
 {   
     LSM_DriverConfig *sensor_config = (LSM_DriverConfig *)handle;
     uint8_t sensor_addr = sensor_config->LSM_8bit_addr;
-    i2c_port_t i2c_port_number = sensor_config->i2c_num;
-
+    i2c_port_t i2c_port_number = sensor_config->i2c_port_num;
 
     esp_err_t err = i2c_master_write_read_device(
         i2c_port_number,
@@ -121,11 +215,11 @@ int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp, uint16_t len)
 }
 
 /**
- * @brief    Handle i2c errors in ESP-iDF
+ * @brief    Handle i2c errors in ESP-iDF using esp_log
  * 
  * @param TAG          tag for esp_log
  * @param err          esp_err_t
- * @return int32_t     0 if okay, else 1
+ * @return int32_t     0 if no error, else return esp_err_t
  */
 int32_t handle_esp_err(char *TAG,esp_err_t err)
 {

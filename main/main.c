@@ -3,6 +3,7 @@
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #include "driver/i2c.h"
 #include "lsm6dsox_driver.h"
@@ -25,8 +26,9 @@ void app_main(void)
     ESP_ERROR_CHECK(i2c_master_init());
     ESP_LOGI(TAG,"I2C Initialised successfully");
 
+    
     LSM_DriverConfig LSM_config = {
-        .i2c_num = 0,
+        .i2c_port_num = 0,
         .LSM_SA = 0,
 
         .Acc_Data_Rate = LSM6DSOX_XL_ODR_104Hz,
@@ -41,6 +43,14 @@ void app_main(void)
     }
     else{
         ESP_LOGI(TAG,"OK");
+    }
+
+    uint8_t rdy;
+
+    while(1){
+        rdy = lsm_data_ready(&LSM_config);
+        ESP_LOGI("main","Data Status %d",rdy);
+        vTaskDelay(1000/portTICK_PERIOD_MS);
     }
 }
 
