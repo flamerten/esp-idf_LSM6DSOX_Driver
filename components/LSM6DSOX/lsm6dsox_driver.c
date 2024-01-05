@@ -1,10 +1,9 @@
 /**
-  ******************************************************************************
-  * @file    lsm6dsox_driver.c
-  * @author  Samuel Yow
-  * @brief   LSM6DSOX_driver driver file
-  ******************************************************************************
-  */
+ * @file               lsm6dsox_driver.c
+ * @author             Samuel Yow (flamerten@gmail.com)
+ * @brief              LSM6DSOX_driver driver file for ESP-iDF, based on ST's lsm6dsox_reg.c 
+ *                     PID driver https://github.com/STMicroelectronics/lsm6dsox-pid.
+ */
 
 #include "lsm6dsox_driver.h"
 
@@ -49,16 +48,15 @@ int lsm_init(LSM_DriverConfig *sensor_config)
 } 
 
 
-//I2C Comm Funcs
 
 /**
- * @brief  Write generic device register for ESP-IDF based on PID 
- *
- * @param  handle    LSM_DriverConfig
- * @param  reg       register to write
- * @param  bufp      pointer to data to write in register reg
- * @param  len       number of consecutive register to write
- *
+ * @brief    Write generic device register for ESP-IDF based on PID
+ * 
+ * @param handle       LSM_DriverConfig
+ * @param Reg          register to write
+ * @param Bufp         pointer to data to write in register reg
+ * @param len          number of consecutive register to write
+ * @return int32_t     0 if ok, else 1
  */
 int32_t platform_write(void *handle, uint8_t Reg, const uint8_t *Bufp, uint16_t len)
 {   
@@ -89,13 +87,13 @@ int32_t platform_write(void *handle, uint8_t Reg, const uint8_t *Bufp, uint16_t 
 
 
 /**
- * @brief  Read generic device register for ESP-IDF based on PID
- *
- * @param  handle    LSM_DriverConfig 
- * @param  reg       register to read
- * @param  bufp      pointer to buffer that store the data read
- * @param  len       number of consecutive register to read
- *
+ * @brief    Read generic device register for ESP-IDF based on PID 
+ * 
+ * @param handle       LSM_DriverConfig 
+ * @param Reg          register to read
+ * @param Bufp         pointer to buffer that store the data read
+ * @param len          number of consecutive register to read
+ * @return int32_t     0 if okay, else 1
  */
 int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp, uint16_t len)
 {   
@@ -122,14 +120,12 @@ int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp, uint16_t len)
     }
 }
 
-
-
 /**
- * @brief Handle i2c errors in ESP-iDF
+ * @brief    Handle i2c errors in ESP-iDF
  * 
- * @param TAG tag for ESP_LOG
- * @param err esp_err_t i2c errors
- * @return int32_t 1 if error, else 0
+ * @param TAG          tag for esp_log
+ * @param err          esp_err_t
+ * @return int32_t     0 if okay, else 1
  */
 int32_t handle_esp_err(char *TAG,esp_err_t err)
 {
