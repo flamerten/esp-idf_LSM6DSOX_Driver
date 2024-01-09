@@ -18,13 +18,6 @@
 
 #define I2C_MASTER_TIMEOUT_MS 1000
 
-typedef struct 
-{
-    i2c_port_t i2c_port_num; 
-    uint8_t LSM_8bit_addr;
-    
-}LSM_SensorHandler;
-
 
 typedef struct
 {   
@@ -48,6 +41,9 @@ typedef struct
 
 int32_t lsm_init(LSM_DriverConfig *sensor_cfg);
 int32_t lsm_data_ready(LSM_DriverConfig *sensor_cfg);
+
+int32_t lsm_update_raw(LSM_DriverConfig *sensor_cfg);
+int32_t lsm_convert_raw(LSM_DriverConfig *sensor_cfg);
 
 int32_t platform_write(void *handle, uint8_t Reg, const uint8_t *Bufp, uint16_t len);
 int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp, uint16_t len);

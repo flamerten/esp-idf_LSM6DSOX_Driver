@@ -55,7 +55,6 @@ int32_t lsm_init(LSM_DriverConfig *sensor_cfg)
     ret = lsm6dsox_i3c_disable_set(&dev_ctx, LSM6DSOX_I3C_DISABLE)  & ret;
     ret = lsm6dsox_block_data_update_set(&dev_ctx, PROPERTY_ENABLE) & ret;
 
-    //Is there a need to set data rate again? - Should cbeck
     ret = lsm6dsox_xl_data_rate_set(&dev_ctx,sensor_cfg->Acc_Data_Rate) & ret; 
     ret = lsm6dsox_xl_full_scale_set(&dev_ctx,sensor_cfg->Acc_Scale)    & ret; 
 
@@ -76,6 +75,14 @@ int32_t lsm_init(LSM_DriverConfig *sensor_cfg)
 
 } 
 
+
+/**
+ * @brief    Update sensor_cfg->Acc_Raw and sensor_cfg->Gyr_Raw
+ * with values from LSM6DSOX sensor via the polling method
+ * 
+ * @param sensor_cfg   ptr to LSM_DriverConfig
+ * @return int32_t     0 if okay, else return esp_err_t
+ */
 int32_t lsm_update_raw(LSM_DriverConfig *sensor_cfg)
 {   
     int32_t err = 0;
@@ -91,6 +98,13 @@ int32_t lsm_update_raw(LSM_DriverConfig *sensor_cfg)
 
 }
 
+/**
+ * @brief    Based on Gyr and Acc Full scale, convert the raw int16_t values to
+ * Gyr(mdps) and Acc(mg) values stored in sensor_cfg->Acc_mg and sensor_cfg->Gyr_mdps 
+ * 
+ * @param sensor_cfg   ptr to LSM_DriverConfig
+ * @return int32_t     returns 0
+ */
 int32_t lsm_convert_raw(LSM_DriverConfig *sensor_cfg)
 {
     lsm6dsox_fs_xl_t AccScale = sensor_cfg->Acc_Scale;
@@ -109,17 +123,40 @@ int32_t lsm_convert_raw(LSM_DriverConfig *sensor_cfg)
         case LSM6DSOX_8g:
             AccScaleChange = &lsm6dsox_from_fs8_to_mg;
             break;
+        default:
+            AccScaleChange = &lsm6dsox_from_fs8_to_mg;
+            ESP_LOGE("LSM_convert","Unspecified Acc Val");
     }
+
+    lsm6dsox_fs_g_t GyrScale = sensor_cfg->Gyr_Scale;
+    float_t(*GyrScaleChange)(int16_t);
+    switch(GyrScale){
+        case LSM6DSOX_250dps:
+            GyrScaleChange = &lsm6dsox_from_fs250_to_mdps;
+            break;
+        case LSM6DSOX_125dps:
+            GyrScaleChange = &lsm6dsox_from_fs125_to_mdps;
+            break;
+        case LSM6DSOX_500dps:
+            GyrScaleChange = &lsm6dsox_from_fs500_to_mdps;
+            break;
+        case LSM6DSOX_1000dps:
+            GyrScaleChange = &lsm6dsox_from_fs1000_to_mdps;
+            break;
+        case LSM6DSOX_2000dps:
+            GyrScaleChange = &lsm6dsox_from_fs2000_to_mdps;
+            break; 
+        default:
+            GyrScaleChange = &lsm6dsox_from_fs2000_to_mdps;
+            ESP_LOGE("LSM_convert","Unspecified Gyr Val");          
+    }
+
     for(int i = 0; i < 3; i++){
         (sensor_cfg->Acc_mg)[i] = AccScaleChange((sensor_cfg->Acc_Raw)[i]);
+        (sensor_cfg->Gyr_mdps)[i] = GyrScaleChange((sensor_cfg->Gyr_Raw)[i]);
     }
 
     return 0;
-}
-
-int32_t lsm_get_raw_gyro(LSM_DriverConfig *sensor_cfg, int16_t *gyr_data)
-{
-    return lsm6dsox_angular_rate_raw_get(&(sensor_cfg->dev_ctx),gyr_data);
 }
 
 /**

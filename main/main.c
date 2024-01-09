@@ -31,8 +31,8 @@ void app_main(void)
         .i2c_port_num = 0,
         .LSM_SA = 0,
 
-        .Acc_Data_Rate = LSM6DSOX_XL_ODR_104Hz,
-        .Gyr_Data_Rate = LSM6DSOX_GY_ODR_104Hz,
+        .Acc_Data_Rate = LSM6DSOX_XL_ODR_26Hz,
+        .Gyr_Data_Rate = LSM6DSOX_GY_ODR_26Hz,
         .Acc_Scale = LSM6DSOX_8g,
         .Gyr_Scale = LSM6DSOX_1000dps
     };
@@ -48,9 +48,18 @@ void app_main(void)
     uint8_t rdy;
 
     while(1){
-        rdy = lsm_data_ready(&LSM_config);
-        ESP_LOGI("main","Data Status %d",rdy);
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+        if(lsm_data_ready(&LSM_config)){
+            lsm_update_raw(&LSM_config);
+            lsm_convert_raw(&LSM_config);
+            ESP_LOGI("main","AccX %.2f, AccY %.2f, AccZ %.2f",
+                LSM_config.Acc_mg[0]/1000,
+                LSM_config.Acc_mg[1]/1000,
+                LSM_config.Acc_mg[2]/1000);
+            ESP_LOGI("main","GyrX %.2f, GyrY %.2f, GyrZ %.2f",
+                LSM_config.Gyr_mdps[0]/1000,
+                LSM_config.Gyr_mdps[1]/1000,
+                LSM_config.Gyr_mdps[2]/1000);
+        }
     }
 }
 
