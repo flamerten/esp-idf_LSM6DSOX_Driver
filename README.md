@@ -3,8 +3,9 @@
 ST LSM6DSOX driver developed using ESP-IDF V4.4 for ESP-IDF based on the [LSM6DSOX Platform Indepdenent Driver](https://github.com/STMicroelectronics/lsm6dsox-pid) provided by ST Engineering. Develompment only has basic features and is still in progress.
 
 ## Instructions for use
-1. Clone the repository and copy the components folder into project folder.
-2. Create a `LSM_DriverConfig` struct and configure it. Then pass it as a pointer to various functions. For example
+1. Clone the repository and copy the components folder into project folder
+2. Initialise a i2c port. An example can be found in esp-idf's example repository: [i2c_self_test](https://github.com/espressif/esp-idf/tree/master/examples/peripherals/i2c/i2c_self_test).
+3. Create a `LSM_DriverConfig` struct and configure it with the i2c port, the scale and data rate of both the gyroscope and accelerometer. Then pass it as a pointer to various functions. For example
 
 ```C
 LSM_DriverConfig LSM_config = {
@@ -20,7 +21,7 @@ LSM_DriverConfig LSM_config = {
 int ret = lsm_init(&LSM_config);
 ```
 
-3. Note that main is simply for testing and development. A example folder may be added in the future.
+Note that `main` is simply for testing and development. A example folder may be added in the future.
 
 ## Current Features
 - `lsm_init(LSM_DriverConfig *sensor_cfg)`: Sensor (accel and gyro) initialisation with scale and data rate 
