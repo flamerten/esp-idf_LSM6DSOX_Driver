@@ -1,32 +1,28 @@
-# _Sample project_
+# LSM6DSOX Driver for ESP-IDF
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+ST LSM6DSOX driver developed using ESP-IDF V4.4 for ESP-IDF based on the [LSM6DSOX Platform Indepdenent Driver](https://github.com/STMicroelectronics/lsm6dsox-pid) provided by ST Engineering. Develompment only has basic features and is still in progress.
 
-This is the simplest buildable example. The example is used by command `idf.py create-project`
-that copies the project to user specified path and set it's name. For more information follow the [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project)
+## Instructions for use
+1. Clone the repository and copy the components folder into project folder.
+2. Create a `LSM_DriverConfig` struct and configure it. Then pass it as a pointer to various functions. For example
 
+```C
+LSM_DriverConfig LSM_config = {
+    .i2c_port_num = 0,
+    .LSM_SA = 0,
 
+    .Acc_Data_Rate = LSM6DSOX_XL_ODR_26Hz,
+    .Gyr_Data_Rate = LSM6DSOX_GY_ODR_26Hz,
+    .Acc_Scale = LSM6DSOX_8g,
+    .Gyr_Scale = LSM6DSOX_1000dps
+};
 
-## How to use example
-We encourage the users to use the example as a template for the new projects.
-A recommended way is to follow the instructions on a [docs page](https://docs.espressif.com/projects/esp-idf/en/latest/api-guides/build-system.html#start-a-new-project).
-
-## Example folder contents
-
-The project **sample_project** contains one source file in C language [main.c](main/main.c). The file is located in folder [main](main).
-
-ESP-IDF projects are built using CMake. The project build configuration is contained in `CMakeLists.txt`
-files that provide set of directives and instructions describing the project's source files and targets
-(executable, library, or both). 
-
-Below is short explanation of remaining files in the project folder.
-
+int ret = lsm_init(&LSM_config);
 ```
-├── CMakeLists.txt
-├── main
-│   ├── CMakeLists.txt
-│   └── main.c
-└── README.md                  This is the file you are currently reading
-```
-Additionally, the sample project contains Makefile and component.mk files, used for the legacy Make based build system. 
-They are not used or needed when building with CMake and idf.py.
+
+3. Note that main is simply for testing and development. A example folder may be added in the future.
+
+## Current Features
+- `lsm_init(LSM_DriverConfig *sensor_cfg)`: Sensor (accel and gyro) initialisation with scale and data rate 
+- `lsm_data_ready(LSM_DriverConfig *sensor_cfg)`, `lsm_update_raw(LSM_DriverConfig *sensor_cfg)`, `lsm_convert_raw(LSM_DriverConfig *sensor_cfg)` Checking if gyro and accel data is ready, before pulling data, and converting it from full scale `int16_t` to `mg` and `mdps`
+
